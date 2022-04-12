@@ -66,4 +66,5 @@ interface PDFToBase64UrlParam {
 }
 export interface PDFContentHandle {
     getPDFToBase64Url: (param?: PDFToBase64UrlParam) => Promise<string>
+    getPDFToArrayBuffer: () => Promise<ArrayBuffer>
 }

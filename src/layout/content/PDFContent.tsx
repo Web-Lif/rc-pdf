@@ -4,15 +4,11 @@ import { notification } from '@weblif/fast-ui'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { PDFDocument, rgb, translate } from 'pdf-lib'
 import { Stage, Layer } from 'react-konva'
-import { produce } from 'immer'
-import { nanoid } from 'nanoid'
 import hexRgb from 'hex-rgb'
 import fontkit from "@pdf-lib/fontkit";
 
-import { DelLineShape, EditType, isDelLineShape, isRectangleShape, isTextShape, MSPosition, PDFContentHandle, RectangleShape, Shape, TextShape } from '../types'
-import TextEdit from './edit/TextEdit'
-import RectangleEdit from './edit/RectangleEdit'
-import DelLineEdit from './edit/DelLineEdit'
+import { EditType, isDelLineShape, isRectangleShape, isTextShape, MSPosition, PDFContentHandle, Shape } from '../types'
+import { emitMouseEvent, emitRenderShapeEvent } from './register'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.js`;
 
@@ -38,7 +34,6 @@ const getPdfColor = (color: string) => {
     const shapeRgb = hexRgb(color)
     return rgb(shapeRgb.red / 255, shapeRgb.green / 255, shapeRgb.blue / 255)
 }
-
 
 const PDFContent = ({
     data,
@@ -131,6 +126,11 @@ const PDFContent = ({
                     dataUri: param?.dataUrl === false ? false : true
                 })
                 return data!;
+            },
+            getPDFToArrayBuffer: async () => {
+                await drawShapeToPdf()
+                const data = await pdfDoc.current?.save()
+                return data!
             }
         }
     }
@@ -156,108 +156,15 @@ const PDFContent = ({
 
     const renderShapes = () => {
         return shapes.filter(shape => shape.pageNo === current).map((shape) => {
-            if (isTextShape(shape)) {
-                const edit = (
-                    <TextEdit
-                        size={shape.size}
-                        shape={shape}
-                        key={nanoid()}
-                        onClick={() => {
-                            const newShapes = produce(shapes, (draft) => {
-                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
-                                const selectShape = draft[eleIndex]
-                                if (isTextShape(selectShape)) {
-                                    selectShape.state = 'edit'
-                                }
-                            })
-                            setShapes(newShapes)
-                        }}
-
-                        fill={shape.color}
-                        onChange={(text) => {
-                            const newShapes = produce(shapes, (draft) => {
-                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
-                                const selectShape = draft[eleIndex]
-                                if (text !== '' && eleIndex > -1 && isTextShape(selectShape)) {
-                                    selectShape.state = 'normal'
-                                    selectShape.text = text
-                                } else {
-                                    draft.splice(eleIndex, 1)
-                                }
-                            })
-                            setShapes(newShapes)
-                        }}
-                    />
-                )
-                if (shape.state === 'new' || shape.state === 'edit') {
-                    htmlEdit.push(edit)
-                    return null
-                }
-                return edit
-            } else if (isRectangleShape(shape)) {
-                return (
-                    <RectangleEdit
-                        shape={shape}
-                        key={nanoid()}
-                        onClick={() => {
-                            const newShapes = produce(shapes, (draft) => {
-                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
-                                const selectShape = draft[eleIndex]
-                                if (isTextShape(selectShape)) {
-                                    selectShape.state = 'edit'
-                                }
-                            })
-                            setShapes(newShapes)
-                        }}
-                        fill={shape.color}
-                        onChange={(text) => {
-                            const newShapes = produce(shapes, (draft) => {
-                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
-                                const selectShape = draft[eleIndex]
-                                if (text !== '' && eleIndex > -1 && isTextShape(selectShape)) {
-                                    selectShape.state = 'normal'
-                                    selectShape.text = text
-                                } else {
-                                    draft.splice(eleIndex, 1)
-                                }
-                            })
-                            setShapes(newShapes)
-                        }}
-                    />
-                )
-            } else if (isDelLineShape(shape)) {
-                return (
-                    <DelLineEdit
-                        shape={shape}
-                        key={nanoid()}
-                        onClick={() => {
-                            const newShapes = produce(shapes, (draft) => {
-                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
-                                const selectShape = draft[eleIndex]
-                                if (isTextShape(selectShape)) {
-                                    selectShape.state = 'edit'
-                                }
-                            })
-                            setShapes(newShapes)
-                        }}
-                        fill={shape.color}
-                        onChange={(text) => {
-                            const newShapes = produce(shapes, (draft) => {
-                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
-                                const selectShape = draft[eleIndex]
-                                if (text !== '' && eleIndex > -1 && isTextShape(selectShape)) {
-                                    selectShape.state = 'normal'
-                                    selectShape.text = text
-                                } else {
-                                    draft.splice(eleIndex, 1)
-                                }
-                            })
-                            setShapes(newShapes)
-                        }}
-                    />
-                )
-            }
-            return null
+            return emitRenderShapeEvent({
+                shapes,
+                setShapes,
+                color,
+                pageNo: current,
+                edit,
+                currentShape: shape,
+                htmlEdit
+            })
         })
     }
 
@@ -323,130 +230,40 @@ const PDFContent = ({
                             height={pdfRef.current?.offsetHeight || 0}
                             width={pdfRef.current?.offsetWidth || 0}
                             onMouseDown={(e) => {
-                                const { x, y } = e.currentTarget.getStage()!.getPointerPosition()!
-                                mouseDownPosition.current = {
-                                    x,
-                                    y
-                                }
-                                if (selectBox === 'rectangle') {
-                                    const newShapes = produce(shapes, (draft) => {
-                                        const rectangShape: RectangleShape = {
-                                            id: nanoid(),
-                                            color,
-                                            position: {
-                                                x,
-                                                y
-                                            },
-                                            type: 'rectangle',
-                                            state: 'new',
-                                            width: 0,
-                                            height: 0,
-                                            pageNo: current
-                                        }
-                                        draft.push(rectangShape)
-                                    })
-                                    setShapes(newShapes)
-                                } else if (selectBox === 'delLine') {
-                                    const newShapes = produce(shapes, (draft) => {
-                                        const rectangShape: DelLineShape = {
-                                            id: nanoid(),
-                                            color,
-                                            position: {
-                                                x,
-                                                y
-                                            },
-                                            end: {
-                                                x,
-                                                y
-                                            },
-                                            type: 'delLine',
-                                            state: 'new',
-                                            pageNo: current,
-                                        }
-                                        draft.push(rectangShape)
-                                    })
-                                    setShapes(newShapes)
-                                }
+                                emitMouseEvent('MouseDown', {
+                                    setShapes,
+                                    shapes,
+                                    selectBox,
+                                    event: e,
+                                    edit,
+                                    pageNo: current,
+                                    color,
+                                    mouseDownPosition: mouseDownPosition.current
+                                })
                             }}
                             onMouseMove={e => {
-                                const { x, y } = e.currentTarget.getStage()!.getPointerPosition()!
-                                if (selectBox === 'rectangle') {
-                                    const newShapes = produce(shapes, (draft) => {
-                                        draft.some(ele => {
-                                            if (ele.state === 'new' && isRectangleShape(ele)) {
-                                                ele.width = Math.abs(mouseDownPosition.current.x - x),
-                                                ele.height = Math.abs(mouseDownPosition.current.y - y)
-                                                ele.state = 'new'
-                                                return true
-                                            }
-                                            return false
-                                        })
-                                    })
-                                    setShapes(newShapes)
-                                } else if (selectBox === 'delLine') {
-                                    const newShapes = produce(shapes, (draft) => {
-                                        draft.some(ele => {
-                                            if (ele.state === 'new' && isDelLineShape(ele)) {
-                                                ele.end = {
-                                                    x,
-                                                    y
-                                                }
-                                                ele.state = 'new'
-                                                return true
-                                            }
-                                            return false
-                                        })
-                                    })
-                                    setShapes(newShapes)
-                                }
+                                emitMouseEvent('MouseMove', {
+                                    setShapes,
+                                    shapes,
+                                    selectBox,
+                                    event: e,
+                                    edit,
+                                    pageNo: current,
+                                    color,
+                                    mouseDownPosition: mouseDownPosition.current
+                                })
                             }}
                             onMouseUp={(e) => {
-                                const { x, y } = e.currentTarget.getStage()!.getPointerPosition()!
-                                if (e.currentTarget.id() === '$stage') {
-                                    if (selectBox === 'text') {
-                                        const newShapes = produce(shapes, (draft) => {
-                                            const textShape: TextShape = {
-                                                id: nanoid(),
-                                                state: 'new',
-                                                color,
-                                                position: {
-                                                    x,
-                                                    y
-                                                },
-                                                type: 'text',
-                                                text: '',
-                                                pageNo: current,
-                                                size: 18
-                                            }
-                                            draft.push(textShape)
-                                        })
-                                        setShapes(newShapes)
-                                    } else if (selectBox === 'rectangle') {
-                                        const newShapes = produce(shapes, (draft) => {
-                                            draft.some(ele => {
-                                                if (ele.state === 'new' && isRectangleShape(ele)) {
-                                                    ele.width = Math.abs(mouseDownPosition.current.x - x)
-                                                    ele.height = Math.abs(mouseDownPosition.current.y - y)
-                                                    ele.state = 'normal'
-                                                }
-                                            })
-                                        })
-                                        setShapes(newShapes)
-                                    } else if (selectBox === 'delLine') {
-                                        const newShapes = produce(shapes, (draft) => {
-                                            draft.some(ele => {
-                                                if (ele.state === 'new' && isDelLineShape(ele)) {
-                                                    ele.end = {
-                                                        x,
-                                                        y
-                                                    }
-                                                    ele.state = 'normal'
-                                                }
-                                            })
-                                        })
-                                        setShapes(newShapes)
-                                    }
-                                }
+                                emitMouseEvent('MouseUp', {
+                                    setShapes,
+                                    shapes,
+                                    selectBox,
+                                    event: e,
+                                    edit,
+                                    pageNo: current,
+                                    color,
+                                    mouseDownPosition: mouseDownPosition.current
+                                })
                             }}
                         >
                             <Layer>

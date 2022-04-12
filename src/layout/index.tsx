@@ -6,6 +6,14 @@ import PDFContent from './content/PDFContent'
 import StateFooter from './footer/StateFooter'
 import type { PDFContentHandle, SelectBoxType } from './types'
 
+import { registerComponent as registerComponentRectangleEdit } from './content/edit/RectangleEdit'
+import { registerComponent as registerComponentDelLineEdit } from './content/edit/DelLineEdit'
+import { registerComponent as registerComponentTextEdit } from './content/edit/TextEdit'
+
+registerComponentRectangleEdit()
+registerComponentDelLineEdit()
+registerComponentTextEdit()
+
 const { Sider, Content, Footer } = Layout;
 
 interface EditLayoutProps extends React.HTMLAttributes<HTMLDivElement> {
