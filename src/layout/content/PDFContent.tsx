@@ -2,22 +2,19 @@ import React, { ReactNode, useEffect, useRef, useState } from 'react'
 import { css } from '@emotion/css'
 import { notification } from '@weblif/fast-ui'
 import { Document, Page, pdfjs } from 'react-pdf'
-import { PDFDocument, rgb } from 'pdf-lib'
+import { PDFDocument, rgb, translate } from 'pdf-lib'
 import { Stage, Layer } from 'react-konva'
 import { produce } from 'immer'
 import { nanoid } from 'nanoid'
 import hexRgb from 'hex-rgb'
+import fontkit from "@pdf-lib/fontkit";
 
-import { EditType, isRectangleShape, isTextShape, MSPosition, RectangleShape, Shape, TextShape } from '../types'
+import { DelLineShape, EditType, isDelLineShape, isRectangleShape, isTextShape, MSPosition, PDFContentHandle, RectangleShape, Shape, TextShape } from '../types'
 import TextEdit from './edit/TextEdit'
 import RectangleEdit from './edit/RectangleEdit'
+import DelLineEdit from './edit/DelLineEdit'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.js`;
-
-interface PDFContentHandle {
-    getPDFToBase64Url: () => Promise<string>
-}
-
 
 interface PDFContentProps {
 
@@ -37,6 +34,10 @@ interface PDFContentProps {
     onChangeTotal?: (val: number) => void
 }
 
+const getPdfColor = (color: string) => {
+    const shapeRgb = hexRgb(color)
+    return rgb(shapeRgb.red / 255, shapeRgb.green / 255, shapeRgb.blue / 255)
+}
 
 
 const PDFContent = ({
@@ -62,25 +63,73 @@ const PDFContent = ({
         x: -1
     })
 
+    let fontBytes = useRef<ArrayBuffer>()
+
     const drawShapeToPdf = async () => {
-        for (let i = 0; i < shapes.length; i += 1) {
-            const shape = shapes[i]
-            const page = pdfDoc.current?.getPage(shape.pageNo)
-            if (isTextShape(shape)) {
-                const shapeRgb = hexRgb(shape.color)
-                page?.drawText(shape.text, {
-                    color: rgb(shapeRgb.red, shapeRgb.green, shapeRgb.blue),
-                    size: shape.size
-                })
+        const pageShapes: Shape[][] = []
+        shapes.forEach(ele => {
+            if (pageShapes[ele.pageNo - 1]) {
+                pageShapes[ele.pageNo - 1].push(ele)
+            } else {
+                pageShapes[ele.pageNo - 1] = [ele]
+            }
+        })
+
+        for (let i = 0; i < pageShapes.length; i += 1) {
+            const shapes = pageShapes[i]
+            const page = pdfDoc.current?.getPage(i)
+            const height = page!.getHeight()
+            page?.pushOperators(translate(0, height))
+            for (let shapeIndex = 0; shapeIndex < shapes.length; shapeIndex += 1) {
+                const shape = shapes[shapeIndex]
+
+                if (isTextShape(shape)) {
+                    if (!fontBytes.current) {
+                        pdfDoc.current?.registerFontkit(fontkit)
+                        fontBytes.current = await fetch('/fonts/WenQuanYiZenHeiMono-02.ttf').then((res) => res.arrayBuffer());
+                    }
+
+                    const helveticaFont = await pdfDoc.current?.embedFont(fontBytes.current!);
+                    page?.drawText(shape.text, {
+                        color: getPdfColor(shape.color),
+                        size: shape.size,
+                        x: shape.position.x,
+                        y: -shape.position.y,
+                        font: helveticaFont,
+                    })
+                } else if (isRectangleShape(shape)) {
+                    page?.drawRectangle({
+                        x: shape.position.x,
+                        y: -(shape.position.y + shape.height),
+                        width: shape.width,
+                        height: shape.height,
+                        borderColor: getPdfColor(shape.color),
+                        borderWidth: 1.5
+                    })
+                } else if (isDelLineShape(shape)) {
+                    page?.drawLine({
+                        start: {
+                            x: shape.position.x,
+                            y: -shape.position.y,
+                        },
+                        end: {
+                            x: shape.end.x,
+                            y: -shape.end.y,
+                        },
+                        color: getPdfColor(shape.color)
+                    })
+                }
             }
         }
     }
 
     if (pdf) {
         pdf.current = {
-            getPDFToBase64Url: async () => {
+            getPDFToBase64Url: async (param) => {
                 await drawShapeToPdf()
-                const data = await pdfDoc.current?.saveAsBase64()
+                const data = await pdfDoc.current?.saveAsBase64({
+                    dataUri: param?.dataUrl === false ? false : true
+                })
                 return data!;
             }
         }
@@ -176,6 +225,37 @@ const PDFContent = ({
                         }}
                     />
                 )
+            } else if (isDelLineShape(shape)) {
+                return (
+                    <DelLineEdit
+                        shape={shape}
+                        key={nanoid()}
+                        onClick={() => {
+                            const newShapes = produce(shapes, (draft) => {
+                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
+                                const selectShape = draft[eleIndex]
+                                if (isTextShape(selectShape)) {
+                                    selectShape.state = 'edit'
+                                }
+                            })
+                            setShapes(newShapes)
+                        }}
+                        fill={shape.color}
+                        onChange={(text) => {
+                            const newShapes = produce(shapes, (draft) => {
+                                const eleIndex = draft.findIndex(ele => ele.id === shape.id)
+                                const selectShape = draft[eleIndex]
+                                if (text !== '' && eleIndex > -1 && isTextShape(selectShape)) {
+                                    selectShape.state = 'normal'
+                                    selectShape.text = text
+                                } else {
+                                    draft.splice(eleIndex, 1)
+                                }
+                            })
+                            setShapes(newShapes)
+                        }}
+                    />
+                )
             }
             return null
         })
@@ -193,7 +273,6 @@ const PDFContent = ({
             <Document
                 file={data}
                 onLoadSuccess={(event) => {
-                    console.log(event.numPages)
                     onChangeTotal?.(event.numPages)
                 }}
                 onLoadError={(e) => {
@@ -267,17 +346,51 @@ const PDFContent = ({
                                         draft.push(rectangShape)
                                     })
                                     setShapes(newShapes)
+                                } else if (selectBox === 'delLine') {
+                                    const newShapes = produce(shapes, (draft) => {
+                                        const rectangShape: DelLineShape = {
+                                            id: nanoid(),
+                                            color,
+                                            position: {
+                                                x,
+                                                y
+                                            },
+                                            end: {
+                                                x,
+                                                y
+                                            },
+                                            type: 'delLine',
+                                            state: 'new',
+                                            pageNo: current,
+                                        }
+                                        draft.push(rectangShape)
+                                    })
+                                    setShapes(newShapes)
                                 }
                             }}
                             onMouseMove={e => {
                                 const { x, y } = e.currentTarget.getStage()!.getPointerPosition()!
-                                console.log(x, y)
                                 if (selectBox === 'rectangle') {
                                     const newShapes = produce(shapes, (draft) => {
                                         draft.some(ele => {
                                             if (ele.state === 'new' && isRectangleShape(ele)) {
                                                 ele.width = Math.abs(mouseDownPosition.current.x - x),
                                                 ele.height = Math.abs(mouseDownPosition.current.y - y)
+                                                ele.state = 'new'
+                                                return true
+                                            }
+                                            return false
+                                        })
+                                    })
+                                    setShapes(newShapes)
+                                } else if (selectBox === 'delLine') {
+                                    const newShapes = produce(shapes, (draft) => {
+                                        draft.some(ele => {
+                                            if (ele.state === 'new' && isDelLineShape(ele)) {
+                                                ele.end = {
+                                                    x,
+                                                    y
+                                                }
                                                 ele.state = 'new'
                                                 return true
                                             }
@@ -314,6 +427,19 @@ const PDFContent = ({
                                                 if (ele.state === 'new' && isRectangleShape(ele)) {
                                                     ele.width = Math.abs(mouseDownPosition.current.x - x)
                                                     ele.height = Math.abs(mouseDownPosition.current.y - y)
+                                                    ele.state = 'normal'
+                                                }
+                                            })
+                                        })
+                                        setShapes(newShapes)
+                                    } else if (selectBox === 'delLine') {
+                                        const newShapes = produce(shapes, (draft) => {
+                                            draft.some(ele => {
+                                                if (ele.state === 'new' && isDelLineShape(ele)) {
+                                                    ele.end = {
+                                                        x,
+                                                        y
+                                                    }
                                                     ele.state = 'normal'
                                                 }
                                             })

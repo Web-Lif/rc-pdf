@@ -9,25 +9,38 @@ nav:
 Demo:
 
 ```tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PDFEdit } from 'ms-pdf';
+import { Button } from '@weblif/fast-ui'
 import 'antd/dist/antd.variable.min.css';
-
 
 export default () => {
     const [data, setData] = useState();
+    const pdf = useRef()
     useEffect(() => {
-        fetch('/test.pdf').then(resp => {
+        fetch('https://pdf-lib.js.org/assets/with_update_sections.pdf').then(resp => {
             resp.arrayBuffer().then((buff) => {
                 setData(buff)
             })
         })
     }, [])
     return (
-        <PDFEdit
-            style={{ height: 800 }}
-            data={data}
-        />
+        <>
+            <Button
+                onClick={() => {
+                    pdf.current.getPDFToBase64Url().then((text) => {
+                        window.open(text)
+                    })
+                }}
+            >
+                查看编辑结果
+            </Button> <br /><br />
+            <PDFEdit
+                pdf={pdf}
+                style={{ height: 800 }}
+                data={data}
+            />
+        </>
     )
 }
 ```

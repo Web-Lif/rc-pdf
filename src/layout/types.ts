@@ -10,7 +10,6 @@ export type EditType = {
     color: string
 }
 
-
 export interface Shape {
     id: string
     color: string
@@ -21,15 +20,22 @@ export interface Shape {
 }
 
 export interface TextShape extends Shape {
+    type: 'text'
     text: string
     size: number
 }
 
 export interface RectangleShape extends Shape {
+    type: 'rectangle'
     width: number
     height: number
 }
 
+
+export interface DelLineShape extends Shape {
+    type: 'delLine'
+    end: MSPosition
+}
 export function isRectangleShape(value: any): value is RectangleShape {
     return !!(
         value &&
@@ -45,4 +51,19 @@ export function isTextShape(value: any): value is TextShape {
         value.type === 'text' &&
         typeof value === 'object'
     );
+}
+
+export function isDelLineShape(value: any): value is DelLineShape {
+    return !!(
+        value &&
+        value.type === 'delLine' &&
+        typeof value === 'object'
+    );
+}
+
+interface PDFToBase64UrlParam {
+    dataUrl?: boolean
+}
+export interface PDFContentHandle {
+    getPDFToBase64Url: (param?: PDFToBase64UrlParam) => Promise<string>
 }

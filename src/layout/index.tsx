@@ -4,17 +4,18 @@ import { css } from '@emotion/css';
 import Toolbox from './side/Toolbox'
 import PDFContent from './content/PDFContent'
 import StateFooter from './footer/StateFooter'
-import type { SelectBoxType } from './types'
+import type { PDFContentHandle, SelectBoxType } from './types'
 
 const { Sider, Content, Footer } = Layout;
 
-
 interface EditLayoutProps extends React.HTMLAttributes<HTMLDivElement> {
     data?: ArrayBuffer
+    pdf?: React.MutableRefObject<PDFContentHandle>
 }
 
 const EditLayout = ({
     data,
+    pdf,
     ...restProps
 }: EditLayoutProps) => {
     const [color, setColor] = useState<string>('#000')
@@ -68,6 +69,7 @@ const EditLayout = ({
                         `}
                     >
                         <PDFContent
+                            pdf={pdf}
                             edit={{
                                 selectBox,
                                 color
