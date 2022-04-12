@@ -102,6 +102,7 @@ const PDFContent = ({
                         borderWidth: 1.5
                     })
                 } else if (isDelLineShape(shape)) {
+                    console.log('drawLine')
                     page?.drawLine({
                         start: {
                             x: shape.position.x,
@@ -109,7 +110,7 @@ const PDFContent = ({
                         },
                         end: {
                             x: shape.end.x,
-                            y: -shape.end.y,
+                            y: -shape.position.y,
                         },
                         color: getPdfColor(shape.color)
                     })
