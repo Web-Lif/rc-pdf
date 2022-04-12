@@ -41,7 +41,6 @@ export const emitMouseEvent = (name: MouseEventName, param: TriggerEventParam) =
     })
 }
 
-
 export interface RenderShapeEventParam  {
     edit: EditType
     shapes: Shape[]
@@ -65,7 +64,6 @@ export const registerRenderShapeEvent = (param: RegisterRenderEventParam) => {
 }
 
 export const emitRenderShapeEvent = (param: RenderShapeEventParam) => {
-    renderShapeEvent.filter(ele => ele.name === param.currentShape.type).forEach(ele => {
-        ele?.onRenderShapeEvent?.(param)
-    })
+    const renderShape = renderShapeEvent.find(ele => ele.name === param.currentShape.type)
+    return renderShape?.onRenderShapeEvent?.(param)
 }

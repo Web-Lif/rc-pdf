@@ -63,7 +63,7 @@ const onMouseDown = ({
     setShapes(newShapes)
 }
 
-const MouseMove = ({
+const onMouseMove = ({
     event,
     shapes,
     setShapes
@@ -85,7 +85,7 @@ const MouseMove = ({
     setShapes(newShapes)
 }
 
-const MouseUp = ({
+const onMouseUp = ({
     event,
     shapes,
     setShapes
@@ -120,24 +120,24 @@ const onRenderShape = ({
 export const registerComponent = () => {
     registerMouseEvent({
         name: 'MouseDown',
-        selectBox: 'rectangle',
+        selectBox: 'delLine',
         onTriggerEvent: onMouseDown
     })
 
     registerMouseEvent({
         name: 'MouseMove',
-        selectBox: 'rectangle',
-        onTriggerEvent: MouseMove
+        selectBox: 'delLine',
+        onTriggerEvent: onMouseMove
     })
 
     registerMouseEvent({
         name: 'MouseUp',
-        selectBox: 'rectangle',
-        onTriggerEvent: MouseUp
+        selectBox: 'delLine',
+        onTriggerEvent: onMouseUp
     })
 
     registerRenderShapeEvent({
-        name: 'rectangle',
+        name: 'delLine',
         onRenderShapeEvent: onRenderShape
     })
 }
