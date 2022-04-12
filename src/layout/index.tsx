@@ -71,9 +71,6 @@ const EditLayout = ({
                     <Content
                         className={css`
                             overflow: auto;
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
                         `}
                     >
                         <PDFContent

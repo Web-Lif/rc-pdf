@@ -175,6 +175,7 @@ const PDFContent = ({
                 width: ${size?.width}px;
                 height: ${size?.height}px;
                 flex-direction: column;
+                margin: 1rem auto;
             `}
         >
             <Document
@@ -198,7 +199,6 @@ const PDFContent = ({
                 <div
                     className={css`
                         position: relative;
-                        margin: 0px 0px 1rem 0px;
                     `}
                 >
                     <Page
@@ -230,6 +230,11 @@ const PDFContent = ({
                             height={pdfRef.current?.offsetHeight || 0}
                             width={pdfRef.current?.offsetWidth || 0}
                             onMouseDown={(e) => {
+                                const { x, y } = e.currentTarget.getStage()!.getPointerPosition()!
+                                mouseDownPosition.current = {
+                                    x,
+                                    y
+                                }
                                 emitMouseEvent('MouseDown', {
                                     setShapes,
                                     shapes,
