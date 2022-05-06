@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Text } from 'react-konva'
 import { Input } from '@weblif/fast-ui'
-import { isTextShape, TextShape } from '@/layout/types'
+import { isTextShape, TextShape } from '../../../layout/types'
 import { css } from '@emotion/css'
 import Konva from 'konva'
 import { registerMouseEvent, registerRenderShapeEvent } from '../register'

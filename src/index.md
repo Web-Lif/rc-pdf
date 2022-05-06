@@ -10,7 +10,7 @@ Demo:
 
 ```tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { PDFEdit } from 'ms-pdf';
+import { PDFEdit } from '@weblif/rc-pdf';
 import { Button } from '@weblif/fast-ui'
 import 'antd/dist/antd.variable.min.css';
 
