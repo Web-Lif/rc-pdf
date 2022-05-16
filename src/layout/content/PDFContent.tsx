@@ -61,60 +61,47 @@ const PDFContent = ({
     let fontBytes = useRef<ArrayBuffer>()
 
     const drawShapeToPdf = async () => {
-        const pageShapes: Shape[][] = []
-        shapes.forEach(ele => {
-            if (pageShapes[ele.pageNo - 1]) {
-                pageShapes[ele.pageNo - 1].push(ele)
-            } else {
-                pageShapes[ele.pageNo - 1] = [ele]
-            }
-        })
-
-        for (let i = 0; i < pageShapes.length; i += 1) {
-            const shapes = pageShapes[i]
-            const page = pdfDoc.current?.getPage(i)
+        for (let i = 0; i < shapes.length; i += 1) {
+            const shape = shapes[i]
+            const page = pdfDoc.current?.getPage(shape.pageNo - 1)
             const height = page!.getHeight()
             page?.pushOperators(translate(0, height))
-            for (let shapeIndex = 0; shapeIndex < shapes.length; shapeIndex += 1) {
-                const shape = shapes[shapeIndex]
+            if (isTextShape(shape)) {
+                if (!fontBytes.current) {
+                    pdfDoc.current?.registerFontkit(fontkit)
+                    fontBytes.current = await fetch('/fonts/WenQuanYiZenHeiMono-02.ttf').then((res) => res.arrayBuffer());
+                }
 
-                if (isTextShape(shape)) {
-                    if (!fontBytes.current) {
-                        pdfDoc.current?.registerFontkit(fontkit)
-                        fontBytes.current = await fetch('/fonts/WenQuanYiZenHeiMono-02.ttf').then((res) => res.arrayBuffer());
-                    }
-
-                    const helveticaFont = await pdfDoc.current?.embedFont(fontBytes.current!);
-                    page?.drawText(shape.text, {
-                        color: getPdfColor(shape.color),
-                        size: shape.size,
+                const helveticaFont = await pdfDoc.current?.embedFont(fontBytes.current!);
+                page?.drawText(shape.text, {
+                    color: getPdfColor(shape.color),
+                    size: shape.size,
+                    x: shape.position.x,
+                    y: -shape.position.y,
+                    font: helveticaFont,
+                })
+            } else if (isRectangleShape(shape)) {
+                page?.drawRectangle({
+                    x: shape.position.x,
+                    y: -(shape.position.y + shape.height),
+                    width: shape.width,
+                    height: shape.height,
+                    borderColor: getPdfColor(shape.color),
+                    borderWidth: 1.5
+                })
+            } else if (isDelLineShape(shape)) {
+                console.log('drawLine')
+                page?.drawLine({
+                    start: {
                         x: shape.position.x,
                         y: -shape.position.y,
-                        font: helveticaFont,
-                    })
-                } else if (isRectangleShape(shape)) {
-                    page?.drawRectangle({
-                        x: shape.position.x,
-                        y: -(shape.position.y + shape.height),
-                        width: shape.width,
-                        height: shape.height,
-                        borderColor: getPdfColor(shape.color),
-                        borderWidth: 1.5
-                    })
-                } else if (isDelLineShape(shape)) {
-                    console.log('drawLine')
-                    page?.drawLine({
-                        start: {
-                            x: shape.position.x,
-                            y: -shape.position.y,
-                        },
-                        end: {
-                            x: shape.end.x,
-                            y: -shape.position.y,
-                        },
-                        color: getPdfColor(shape.color)
-                    })
-                }
+                    },
+                    end: {
+                        x: shape.end.x,
+                        y: -shape.position.y,
+                    },
+                    color: getPdfColor(shape.color)
+                })
             }
         }
     }

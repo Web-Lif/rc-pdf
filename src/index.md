@@ -18,7 +18,7 @@ export default () => {
     const [data, setData] = useState();
     const pdf = useRef()
     useEffect(() => {
-        fetch('https://pdf-lib.js.org/assets/with_update_sections.pdf').then(resp => {
+        fetch('http://127.0.0.1:8000/test.pdf').then(resp => {
             resp.arrayBuffer().then((buff) => {
                 setData(buff)
             })
